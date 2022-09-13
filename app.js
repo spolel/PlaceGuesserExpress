@@ -66,7 +66,7 @@ app.get('/get_leaderboard', async (req, res) => {
 app.get('/get_rank_from_leaderboard', async (req, res) => {
   const highscore = req.query.highscore
 
-  const { data, error } = await supabase.from('leaderboard').select().order('score', { ascending: false }).gte('score', parseInt(highscore))
+  const { data, error } = await supabase.from('leaderboard').select().order('score', { ascending: false }).gt('score', parseInt(highscore))
   res.send([data.length])
 });
 
