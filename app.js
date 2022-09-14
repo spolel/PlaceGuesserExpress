@@ -5,6 +5,7 @@ import cors from 'cors';
 
 
 import { createClient } from '@supabase/supabase-js'
+import { Client } from "@googlemaps/google-maps-services-js";
 
 dotenv.config();
 
@@ -20,8 +21,12 @@ const supabase = createClient(
   supabaseKey
 )
 
+const gmaps = new Client({});
+
+
+
 app.get('/', (req, res) => {
-  res.send('Express + TypeScript Server');
+  res.send('Express Server');
 });
 
 app.get('/test', async (req, res) => {
@@ -29,13 +34,83 @@ app.get('/test', async (req, res) => {
   res.send(data)
 });
 
+app.get('/testgeo', async (req, res) => {
+  //.eq("country code", "CN")
+  const { data, error } = await supabase.from('random_places').select().limit(1)
+  const randomPlace = { lat: data[0].latitude, lng: data[0].longitude }
+  console.log(data[0].name)
+  console.log(randomPlace.lat, ", ", randomPlace.lng)
+
+  const placeIds = await getPlaceIds(randomPlace)
+  console.log(placeIds)
+
+  for (let i = 0; i < placeIds.length; i++) {
+    const details = await getPlaceDetails(placeIds[i])
+    if (details.photos != undefined) {
+      console.log(i)
+      console.log(details.name)
+      console.log(details.geometry.location)
+      res.send(details)
+      break
+    }
+  }
+
+});
+
+async function getPlaceIds(randomPlace) {
+  const placeIds = await gmaps
+    .reverseGeocode({
+      params: {
+        latlng: randomPlace,
+        key: process.env.GOOGLE_MAPS_API_KEY,
+        result_type: ["locality", "political", "plus_code"]
+      },
+      timeout: 1000, // milliseconds
+    })
+    .then((r) => {
+      //console.log(r.data.results);
+      const placeIds = []
+      r.data.results.forEach(x => {
+        placeIds.push(x.place_id)
+      })
+      //console.log(placeIds, "inside")
+
+      return placeIds
+    })
+    .catch((e) => {
+      console.log(e.response.data.error_message);
+    });
+
+  return placeIds
+}
+
+async function getPlaceDetails(placeId) {
+  const details = await gmaps
+    .placeDetails({
+      params: {
+        place_id: placeId,
+        key: process.env.GOOGLE_MAPS_API_KEY,
+        fields: ['name', 'geometry','photos']
+      },
+      timeout: 1000, // milliseconds
+    })
+    .then((r) => {
+      //console.log(r.data.result);
+      return r.data.result
+    })
+    .catch((e) => {
+      console.log(e.response.data.error_message);
+    });
+  return details
+}
+
 app.get('/get_random_place', async (req, res) => {
   const pop = req.query.pop
   const zone = req.query.zone
 
   if (zone == 'worldwide') {
-    const { data, error } = await supabase.from('random_places').select().gte('population', parseInt(pop)).limit(1)
-    res.send(data)
+    const { place, error } = await supabase.from('random_places').select().gte('population', parseInt(pop)).limit(1)
+    res.send(place)
   } else {
     const continents = {
       "africa": ["Africa"],
