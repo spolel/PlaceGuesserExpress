@@ -38,51 +38,65 @@ app.get('/testgeo', async (req, res) => {
   //.eq("country code", "CN")
   const { data, error } = await supabase.from('random_places').select().limit(1)
   const randomPlace = { lat: data[0].latitude, lng: data[0].longitude }
-  console.log(data[0].name)
+  console.log("Random place: ", data[0].name, ", ", data[0]["country code"])
   console.log(randomPlace.lat, ", ", randomPlace.lng)
 
-  const placeIds = await getPlaceIds(randomPlace)
-  console.log(placeIds)
+  const geocodeResult = await reverseGeocode(randomPlace)
+  const placeIds = []
+  geocodeResult.forEach(x => {
+    placeIds.push(x.place_id)
+  })
+  // console.log(placeIds)
 
-  for (let i = 0; i < placeIds.length; i++) {
-    const details = await getPlaceDetails(placeIds[i])
-    if (details.photos != undefined) {
-      console.log(i)
-      console.log(details.name)
-      console.log(details.geometry.location)
-      res.send(details)
-      break
-    }
-  }
+  const details = await getPlaceDetails(placeIds[0])
+  console.log("Found place: ", geocodeResult[0].formatted_address)
+  console.log(details.geometry.location.lat, ", ", details.geometry.location.lng)
+
+  details.formatted_address = geocodeResult[0].formatted_address
+  res.send(details)
+
+  // for (let i = 0; i < placeIds.length; i++) {
+  //   const details = await getPlaceDetails(placeIds[i])
+  //   if (details.photos != undefined) {
+  //     console.log(i)
+  //     console.log(details.name)
+  //     console.log(details.geometry.location)
+  //     res.send(details)
+  //     break
+  //   }
+  // }
 
 });
 
-async function getPlaceIds(randomPlace) {
-  const placeIds = await gmaps
+async function reverseGeocode(randomPlace) {
+  const result = await gmaps
     .reverseGeocode({
       params: {
         latlng: randomPlace,
         key: process.env.GOOGLE_MAPS_API_KEY,
-        result_type: ["locality", "political", "plus_code"]
+        result_type: ["locality", "political"]
+        //"plus_code"
       },
       timeout: 1000, // milliseconds
     })
     .then((r) => {
       //console.log(r.data.results);
-      const placeIds = []
-      r.data.results.forEach(x => {
-        placeIds.push(x.place_id)
-      })
-      //console.log(placeIds, "inside")
+      // const placeIds = []
+      // r.data.results.forEach(x => {
+      //   placeIds.push(x.place_id)
+      // })
 
-      return placeIds
+      // return placeIds
+      return r.data.results
     })
     .catch((e) => {
       console.log(e.response.data.error_message);
     });
 
-  return placeIds
+  return result
 }
+
+
 
 async function getPlaceDetails(placeId) {
   const details = await gmaps
@@ -90,7 +104,7 @@ async function getPlaceDetails(placeId) {
       params: {
         place_id: placeId,
         key: process.env.GOOGLE_MAPS_API_KEY,
-        fields: ['name', 'geometry','photos']
+        fields: ['name', 'geometry', 'photos']
       },
       timeout: 1000, // milliseconds
     })
@@ -104,13 +118,61 @@ async function getPlaceDetails(placeId) {
   return details
 }
 
+// gmaps
+//   .placePhoto({
+//     params: {
+//       photoreference: details.photos[0].photo_reference,
+//       maxwidth: 500,
+//       key: process.env.GOOGLE_MAPS_API_KEY
+//     },
+//     responseType: "blob",
+//     timeout: 1000, // milliseconds
+//   })
+//   .then((photo) => {
+//     console.log(typeof photo)
+//     //res.type('blob').send(photo);
+//     //res.type('image/png').send(photo)
+//     //res.send(photo);
+//     console.log(photo.length)
+//     //res.sendFile(photo)
+//     res.setHeader('Content-Length', photo.length);
+//     res.write(file, 'binary');
+//     res.end();
+//   })
+//   .catch((e) => {
+//     console.log(e);
+//   });
+
+async function getPhoto(photoReference) {
+  const result = await gmaps
+    .placePhoto({
+      params: {
+        photoreference: photoReference,
+        key: process.env.GOOGLE_MAPS_API_KEY
+      },
+      timeout: 1000, // milliseconds
+    })
+    .then((photo) => {
+      console.log(photo)
+      console.log(typeof photo)
+      console.log("lul")
+      console.log(typeof "lul")
+      return photo
+    })
+    .catch((e) => {
+      console.log(e.response.data.error_message);
+    });
+  return result
+}
+
 app.get('/get_random_place', async (req, res) => {
   const pop = req.query.pop
   const zone = req.query.zone
 
+  let place;
   if (zone == 'worldwide') {
-    const { place, error } = await supabase.from('random_places').select().gte('population', parseInt(pop)).limit(1)
-    res.send(place)
+    const { data, error } = await supabase.from('random_places').select().gte('population', parseInt(pop)).limit(1)
+    place = data;
   } else {
     const continents = {
       "africa": ["Africa"],
@@ -122,8 +184,94 @@ app.get('/get_random_place', async (req, res) => {
     }
 
     const { data, error } = await supabase.from('random_places').select().in('continent', continents[zone]).gte('population', parseInt(pop)).limit(1)
-    res.send(data)
+    place = data;
   }
+
+  const randomPlace = { lat: place[0].latitude, lng: place[0].longitude }
+  console.log("Random place: ", place[0].asciiname, ", ", place[0]["country code"])
+  console.log(randomPlace.lat, ", ", randomPlace.lng)
+
+  const geocodeResult = await reverseGeocode(randomPlace)
+
+  let containsNameIndex;
+  let localityIndex;
+  let biggestSublocalityIndex;
+  let firstPoliticalIndex = 0;
+
+  for (let i = geocodeResult.length - 1; i >= 0; i--) {
+    //console.log(geocodeResult[i].formatted_address.split(','))
+    //console.log(geocodeResult[i].formatted_address.split(',')[0].toLowerCase(), " ", place[0].asciiname.replace(/[^a-zA-Z ]/g, " ").toLowerCase())
+    if(geocodeResult[i].formatted_address.split(',')[0].toLowerCase().includes(place[0].asciiname.replace(/[^a-zA-Z ]/g, " ").toLowerCase())){
+      containsNameIndex = i
+      break;
+    }
+  }
+
+
+  for (let i = 0; i < geocodeResult.length; i++) {
+    //console.log(geocodeResult[i].formatted_address.split(','))
+    if(geocodeResult[i].types.includes("locality")){
+      localityIndex = i
+    }
+
+    if(geocodeResult[i].types.includes("sublocality")){
+      biggestSublocalityIndex = i
+    }
+  }
+
+  //default
+  let placeIndex = containsNameIndex;
+
+  if(containsNameIndex == undefined){
+    placeIndex = localityIndex
+  }else if(localityIndex < containsNameIndex){
+    placeIndex = localityIndex
+  }
+
+  //this means there was no containsName and no locality
+  if(placeIndex == undefined){
+    placeIndex = biggestSublocalityIndex
+  }
+
+  //last resort
+  if(placeIndex == undefined){
+    placeIndex = firstPoliticalIndex
+  }
+
+  //china specific, they have different structure
+  if(place[0]["country code"] == "CN"){
+    if(containsNameIndex == undefined){
+      placeIndex = firstPoliticalIndex
+    }
+  }
+
+  //japan specific
+  if(place[0]["country code"] == "JP"){
+    if(containsNameIndex == undefined){
+      placeIndex = biggestSublocalityIndex
+    }
+  }
+
+  //TODO: example Japan names like Kamojimacho-jogejima != Kamojimacho Jogejima
+
+  if(placeIndex == undefined){
+    res.send([])
+    return;
+  }
+
+  console.log("contains name index: ", containsNameIndex)
+  console.log("locality index: ",localityIndex)
+  console.log(placeIndex)
+
+  const details = await getPlaceDetails(geocodeResult[placeIndex].place_id)
+  console.log("Found place: ", geocodeResult[placeIndex].formatted_address)
+  console.log(details.geometry.location.lat, ", ", details.geometry.location.lng)
+  console.log("===================")
+
+  details.formatted_address = geocodeResult[placeIndex].formatted_address
+  res.send(details)
+  return;
+
 
 });
 
