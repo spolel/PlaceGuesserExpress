@@ -269,6 +269,7 @@ app.get('/get_random_place', async (req, res) => {
   console.log("===================")
 
   details.formatted_address = geocodeResult[placeIndex].formatted_address
+  details.geonameid = place[0].geonameid
   res.send(details)
   return;
 
