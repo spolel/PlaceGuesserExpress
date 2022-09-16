@@ -214,7 +214,7 @@ app.get('/get_random_place', async (req, res) => {
 
   details.formatted_address = geocodeResult[placeIndex].formatted_address
   details.geonameid = place[0].geonameid
-  details.name = place[0].name
+  details.name = geocodeResult[placeIndex].formatted_address.split(',')[0].replace(/[0-9]/g, '')
   details["country code"] = place[0]["country code"]
   res.send(details)
   return;
