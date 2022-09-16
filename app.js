@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 
-
 import { createClient } from '@supabase/supabase-js'
 import { Client } from "@googlemaps/google-maps-services-js";
 
@@ -22,7 +21,6 @@ const supabase = createClient(
 )
 
 const gmaps = new Client({});
-
 
 
 app.get('/', (req, res) => {
@@ -68,6 +66,7 @@ app.get('/testgeo', async (req, res) => {
 
 });
 
+//google api call to reversegeocode coordinates
 async function reverseGeocode(randomPlace) {
   const result = await gmaps
     .reverseGeocode({
@@ -76,17 +75,9 @@ async function reverseGeocode(randomPlace) {
         key: process.env.GOOGLE_MAPS_API_KEY,
         result_type: ["locality", "political"]
         //"plus_code"
-      },
-      timeout: 1000, // milliseconds
+      }
     })
     .then((r) => {
-      //console.log(r.data.results);
-      // const placeIds = []
-      // r.data.results.forEach(x => {
-      //   placeIds.push(x.place_id)
-      // })
-
-      // return placeIds
       return r.data.results
     })
     .catch((e) => {
@@ -96,8 +87,7 @@ async function reverseGeocode(randomPlace) {
   return result
 }
 
-
-
+//google api call to get details from placeid
 async function getPlaceDetails(placeId) {
   const details = await gmaps
     .placeDetails({
@@ -105,8 +95,7 @@ async function getPlaceDetails(placeId) {
         place_id: placeId,
         key: process.env.GOOGLE_MAPS_API_KEY,
         fields: ['name', 'geometry', 'photos']
-      },
-      timeout: 1000, // milliseconds
+      }
     })
     .then((r) => {
       //console.log(r.data.result);
@@ -118,53 +107,10 @@ async function getPlaceDetails(placeId) {
   return details
 }
 
-// gmaps
-//   .placePhoto({
-//     params: {
-//       photoreference: details.photos[0].photo_reference,
-//       maxwidth: 500,
-//       key: process.env.GOOGLE_MAPS_API_KEY
-//     },
-//     responseType: "blob",
-//     timeout: 1000, // milliseconds
-//   })
-//   .then((photo) => {
-//     console.log(typeof photo)
-//     //res.type('blob').send(photo);
-//     //res.type('image/png').send(photo)
-//     //res.send(photo);
-//     console.log(photo.length)
-//     //res.sendFile(photo)
-//     res.setHeader('Content-Length', photo.length);
-//     res.write(file, 'binary');
-//     res.end();
-//   })
-//   .catch((e) => {
-//     console.log(e);
-//   });
-
-async function getPhoto(photoReference) {
-  const result = await gmaps
-    .placePhoto({
-      params: {
-        photoreference: photoReference,
-        key: process.env.GOOGLE_MAPS_API_KEY
-      },
-      timeout: 1000, // milliseconds
-    })
-    .then((photo) => {
-      console.log(photo)
-      console.log(typeof photo)
-      console.log("lul")
-      console.log(typeof "lul")
-      return photo
-    })
-    .catch((e) => {
-      console.log(e.response.data.error_message);
-    });
-  return result
-}
-
+//random place is chosen from database,
+//the google reverse geocoding is run on coordinates
+//after getting the closest result we request details to google api
+//in the end return place details and photos
 app.get('/get_random_place', async (req, res) => {
   const pop = req.query.pop
   const zone = req.query.zone
@@ -201,7 +147,7 @@ app.get('/get_random_place', async (req, res) => {
   for (let i = geocodeResult.length - 1; i >= 0; i--) {
     //console.log(geocodeResult[i].formatted_address.split(','))
     //console.log(geocodeResult[i].formatted_address.split(',')[0].toLowerCase(), " ", place[0].asciiname.replace(/[^a-zA-Z ]/g, " ").toLowerCase())
-    if(geocodeResult[i].formatted_address.split(',')[0].toLowerCase().includes(place[0].asciiname.replace(/[^a-zA-Z ]/g, " ").toLowerCase())){
+    if (geocodeResult[i].formatted_address.split(',')[0].toLowerCase().includes(place[0].asciiname.replace(/[^a-zA-Z ]/g, " ").toLowerCase())) {
       containsNameIndex = i
       break;
     }
@@ -210,11 +156,11 @@ app.get('/get_random_place', async (req, res) => {
 
   for (let i = 0; i < geocodeResult.length; i++) {
     //console.log(geocodeResult[i].formatted_address.split(','))
-    if(geocodeResult[i].types.includes("locality")){
+    if (geocodeResult[i].types.includes("locality")) {
       localityIndex = i
     }
 
-    if(geocodeResult[i].types.includes("sublocality")){
+    if (geocodeResult[i].types.includes("sublocality")) {
       biggestSublocalityIndex = i
     }
   }
@@ -222,45 +168,43 @@ app.get('/get_random_place', async (req, res) => {
   //default
   let placeIndex = containsNameIndex;
 
-  if(containsNameIndex == undefined){
+  if (containsNameIndex == undefined) {
     placeIndex = localityIndex
-  }else if(localityIndex < containsNameIndex){
+  } else if (localityIndex < containsNameIndex) {
     placeIndex = localityIndex
   }
 
   //this means there was no containsName and no locality
-  if(placeIndex == undefined){
+  if (placeIndex == undefined) {
     placeIndex = biggestSublocalityIndex
   }
 
   //last resort
-  if(placeIndex == undefined){
+  if (placeIndex == undefined) {
     placeIndex = firstPoliticalIndex
   }
 
   //china specific, they have different structure
-  if(place[0]["country code"] == "CN"){
-    if(containsNameIndex == undefined){
+  if (place[0]["country code"] == "CN") {
+    if (containsNameIndex == undefined) {
       placeIndex = firstPoliticalIndex
     }
   }
 
   //japan specific
-  if(place[0]["country code"] == "JP"){
-    if(containsNameIndex == undefined){
+  if (place[0]["country code"] == "JP") {
+    if (containsNameIndex == undefined) {
       placeIndex = biggestSublocalityIndex
     }
   }
 
-  //TODO: example Japan names like Kamojimacho-jogejima != Kamojimacho Jogejima
-
-  if(placeIndex == undefined){
+  if (placeIndex == undefined) {
     res.send([])
     return;
   }
 
   console.log("contains name index: ", containsNameIndex)
-  console.log("locality index: ",localityIndex)
+  console.log("locality index: ", localityIndex)
   console.log(placeIndex)
 
   const details = await getPlaceDetails(geocodeResult[placeIndex].place_id)
@@ -278,17 +222,37 @@ app.get('/get_random_place', async (req, res) => {
 
 });
 
+//returns direct url of that photo from google api
+app.get('/get_photo_url', async (req, res) => {
+  const photoreference = req.query.photoreference
+
+  gmaps
+    .placePhoto({
+      params: {
+        photoreference: photoreference,
+        maxwidth: 1600,
+        key: process.env.GOOGLE_MAPS_API_KEY
+      },
+      responseType: "blob"
+    })
+    .then((photo) => {
+      //console.log(photo.request.res.responseUrl)
+      res.send(photo.request.res.responseUrl);
+      return
+    })
+    .catch((e) => {
+      console.log(e);
+    });
+});
+
+//returns leaderboard
 app.get('/get_leaderboard', async (req, res) => {
   const { data, error } = await supabase.from('leaderboard').select().order('score', { ascending: false })
-  // data.forEach(async x => {
-  //   const { data, error } = await supabase.from('leaderboard').upsert({
-  //     id: x.id,
-  //     paths: JSON.parse(x.paths)
-  //   })
-  // })
   res.send(data)
 });
 
+//returns the rank in the leaderboard of a given score
+//row number when ordered by descending score
 app.get('/get_rank_from_leaderboard', async (req, res) => {
   const highscore = req.query.highscore
 
@@ -296,29 +260,7 @@ app.get('/get_rank_from_leaderboard', async (req, res) => {
   res.send([data.length])
 });
 
-app.get('/get_history', async (req, res) => {
-  const username = req.query.username
-
-  const { data, error } = await supabase.from('history').select().eq('username', username)
-  res.send(data)
-});
-
-app.post('/save_history', async (req, res) => {
-  const username = req.query.username
-  const reqBody = req.body
-
-  try {
-    const { data, error } = await supabase.from('history').upsert({
-      username: username,
-      history: reqBody
-    })
-    res.send(data)
-  } catch (err) {
-    res.send(err)
-  }
-
-});
-
+//saves finished game score and data to leaderboard
 app.post('/save_score_to_leaderboard', async (req, res) => {
   const reqBody = req.body
 
@@ -347,10 +289,36 @@ app.post('/save_score_to_leaderboard', async (req, res) => {
 
 });
 
+//gets the history data of a given user
+app.get('/get_history', async (req, res) => {
+  const username = req.query.username
+
+  const { data, error } = await supabase.from('history').select().eq('username', username)
+  res.send(data)
+});
+
+//saves history data of a given user
+app.post('/save_history', async (req, res) => {
+  const username = req.query.username
+  const reqBody = req.body
+
+  try {
+    const { data, error } = await supabase.from('history').upsert({
+      username: username,
+      history: reqBody
+    })
+    res.send(data)
+  } catch (err) {
+    res.send(err)
+  }
+
+});
+
 app.listen(port, () => {
   console.log(`⚡️[server]: Server is running at https://localhost:${port}`);
 });
 
+//generates the score of a round based on gamemode and distance
 function generateScore(distance, gamemode) {
   if (gamemode == 'europe') {
     if (distance > 1500) {
@@ -394,8 +362,6 @@ function generateScore(distance, gamemode) {
     }
   }
 }
-
-
 
 //calculates distance from two pairs of coordinates
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
