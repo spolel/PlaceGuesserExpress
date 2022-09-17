@@ -114,10 +114,14 @@ async function getPlaceDetails(placeId) {
 app.get('/get_random_place', async (req, res) => {
   const pop = req.query.pop
   const zone = req.query.zone
+  const countrycode = req.query.countrycode
 
   let place;
   if (zone == 'worldwide') {
     const { data, error } = await supabase.from('random_places').select().gte('population', parseInt(pop)).limit(1)
+    place = data;
+  } else if (countrycode != undefined) {
+    const { data, error } = await supabase.from('random_places').select().eq("country code", countrycode).gte('population', parseInt(pop)).limit(1)
     place = data;
   } else {
     const continents = {
