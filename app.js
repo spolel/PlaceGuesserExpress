@@ -6,6 +6,8 @@ import cors from 'cors';
 import { createClient } from '@supabase/supabase-js'
 import { Client } from "@googlemaps/google-maps-services-js";
 
+import { bounds } from "./countryBoundingBoxes.js"
+
 dotenv.config();
 
 const app = express();
@@ -271,9 +273,9 @@ app.post('/save_score_to_leaderboard', async (req, res) => {
   //recomputing score and multis to avoid cheated score posting
   let totalBaseScore = 0
   reqBody.paths.forEach(path => {
-    totalBaseScore += generateScore(getDistanceFromLatLonInKm(path[0]["lat"], path[0]["lng"], path[1]["lat"], path[1]["lng"]), reqBody.gamemode)
+    totalBaseScore += generateScore(getDistanceFromLatLonInKm(path[0]["lat"], path[0]["lng"], path[1]["lat"], path[1]["lng"]), reqBody.zonemode, reqBody.gamemode)
   })
-  let multi = getGameMulti(reqBody.gamemode, reqBody.population)
+  let multi = getGameMulti(reqBody.zonemode, reqBody.population)
 
 
   try {
@@ -283,6 +285,7 @@ app.post('/save_score_to_leaderboard', async (req, res) => {
       multi: multi,
       score: totalBaseScore * multi,
       gamemode: reqBody.gamemode,
+      zonemode: reqBody.zonemode,
       population: reqBody.population,
       paths: reqBody.paths
     })
@@ -323,47 +326,33 @@ app.listen(port, () => {
 });
 
 //generates the score of a round based on gamemode and distance
-function generateScore(distance, gamemode) {
-  if (gamemode == 'europe') {
-    if (distance > 1500) {
-      return 0
-    } else if (distance <= 50) {
-      return 1000
-    } else {
-      return Math.floor(1000 * (1 - ((distance - 50) / 1450)) ** 2)
-    }
-  } else if (gamemode == 'americas') {
-    if (distance > 2000) {
-      return 0
-    } else if (distance <= 50) {
-      return 1000
-    } else {
-      return Math.floor(1000 * (1 - ((distance - 50) / 1950)) ** 2)
-    }
-  } else if (gamemode == 'africa') {
-    if (distance > 2500) {
-      return 0
-    } else if (distance <= 50) {
-      return 1000
-    } else {
-      return Math.floor(1000 * (1 - ((distance - 50) / 2450)) ** 2)
-    }
-  } else if (gamemode == 'asia/oceania') {
-    if (distance > 2000) {
-      return 0
-    } else if (distance <= 50) {
-      return 1000
-    } else {
-      return Math.floor(1000 * (1 - ((distance - 50) / 1950)) ** 2)
-    }
+function generateScore(distance, zoneMode, gameMode) {
+  let zoneMaxDistance = {
+    "worldwide": 2500,
+    "europe": 1500,
+    "africa": 2500,
+    "americas": 2000,
+    "asia/oceania": 2000
+  }
+
+  let maxDistance = zoneMaxDistance[zoneMode]
+  let maxPointsCutoff = 50
+
+  // calculate maxDistance based on country bounds
+  if (gameMode == 'country') {
+    const diagonal = getDistanceFromLatLonInKm(bounds[countryCode][1][0], bounds[countryCode][1][1], bounds[countryCode][1][2], bounds[countryCode][1][3])
+
+    maxDistance = diagonal / 4
+    maxPointsCutoff = diagonal / 500
+  }
+
+  if (distance > maxDistance) {
+    return 0
+  } else if (distance <= maxPointsCutoff) {
+    return 1000
   } else {
-    if (distance > 2500) {
-      return 0
-    } else if (distance <= 50) {
-      return 1000
-    } else {
-      return Math.floor(1000 * (1 - ((distance - 50) / 2450)) ** 2)
-    }
+    console.log(Math.floor(1000 * (1 - ((distance - maxPointsCutoff) / (maxDistance - maxPointsCutoff))) ** 2))
+    return Math.floor(1000 * (1 - ((distance - maxPointsCutoff) / (maxDistance - maxPointsCutoff))) ** 2)
   }
 }
 
