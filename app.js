@@ -273,10 +273,13 @@ app.post('/save_score_to_leaderboard', async (req, res) => {
   //recomputing score and multis to avoid cheated score posting
   let totalBaseScore = 0
   reqBody.paths.forEach(path => {
-    totalBaseScore += generateScore(getDistanceFromLatLonInKm(path[0]["lat"], path[0]["lng"], path[1]["lat"], path[1]["lng"]), reqBody.zonemode, reqBody.gamemode)
+    totalBaseScore += generateScore(getDistanceFromLatLonInKm(path[0]["lat"], path[0]["lng"], path[1]["lat"], path[1]["lng"]), reqBody.zonemode, reqBody.gamemode, reqBody.countrycode)
   })
-  let multi = getGameMulti(reqBody.zonemode, reqBody.population)
 
+  let multi = getGameMulti(reqBody.zonemode, reqBody.population)
+  if (reqBody.gamemode == "country") {
+    multi = 1
+  }
 
   try {
     const { data, error } = await supabase.from('leaderboard').insert({
@@ -286,6 +289,7 @@ app.post('/save_score_to_leaderboard', async (req, res) => {
       score: totalBaseScore * multi,
       gamemode: reqBody.gamemode,
       zonemode: reqBody.zonemode,
+      countrycode: reqBody.countrycode,
       population: reqBody.population,
       paths: reqBody.paths
     })
@@ -326,7 +330,7 @@ app.listen(port, () => {
 });
 
 //generates the score of a round based on gamemode and distance
-function generateScore(distance, zoneMode, gameMode) {
+function generateScore(distance, zoneMode, gameMode, countryCode) {
   let zoneMaxDistance = {
     "worldwide": 2500,
     "europe": 1500,
