@@ -253,7 +253,7 @@ app.get('/get_photo_url', async (req, res) => {
 
 //returns leaderboard
 app.get('/get_leaderboard', async (req, res) => {
-  const { data, error } = await supabase.from('leaderboard').select().order('score', { ascending: false })
+  const { data, error } = await supabase.from('leaderboard').select().order('score', { ascending: false }).limit(100)
   res.send(data)
 });
 
@@ -305,6 +305,14 @@ app.get('/get_history', async (req, res) => {
   const username = req.query.username
 
   const { data, error } = await supabase.from('history').select().eq('username', username)
+  res.send(data)
+});
+
+//checks if username already exists
+app.get('/username_exists', async (req, res) => {
+  const username = req.query.username
+
+  const { data, error } = await supabase.from('profiles').select().eq('username', username)
   res.send(data)
 });
 
