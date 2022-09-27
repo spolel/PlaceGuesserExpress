@@ -204,6 +204,13 @@ app.get('/get_random_place', async (req, res) => {
     }
   }
 
+  //switzerland specific
+  if (place[0]["country code"] == "CH") {
+    if (containsNameIndex == undefined) {
+      placeIndex = biggestSublocalityIndex
+    }
+  }
+
   if (placeIndex == undefined) {
     res.send([])
     return;
