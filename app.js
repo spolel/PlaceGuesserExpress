@@ -391,7 +391,7 @@ app.get("/get_stats", async (req, res) => {
       .order("score", { ascending: false })
       .gt("score", parseInt(highscore));
 
-    rank = data.length;
+    rank = data.length + 1;
   } catch (err) {
     res.send(err);
   }
