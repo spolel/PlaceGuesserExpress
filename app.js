@@ -302,7 +302,7 @@ app.get("/get_leaderboard", async (req, res) => {
 
 //returns leaderboard paged
 app.get("/get_leaderboard_paged", async (req, res) => {
-  const index = parseInt(req.query.offset);
+  const index = parseInt(req.query.index);
   const size = parseInt(req.query.size);
 
   const offset = index * size
@@ -320,9 +320,38 @@ app.get("/get_leaderboard_length", async (req, res) => {
   const { data, error } = await supabase
     .from("leaderboard")
     .select()
-    .order("score", { ascending: false })
   res.send([data.length]);
 });
+
+//returns games of a specific user, paged
+app.get("/get_user_games_paged", async (req, res) => {
+  const index = parseInt(req.query.index);
+  const size = parseInt(req.query.size);
+  const username = req.query.username;
+
+  const offset = index * size
+  
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select()
+    .eq('username', username)
+    .order("score", { ascending: false })
+    .range(offset, offset+size-1);
+  res.send(data);
+});
+
+//returns number of played games
+app.get("/get_user_games_length", async (req, res) => {  
+  const username = req.query.username;
+  
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select()
+    .eq('username', username)
+  res.send([data.length]);
+});
+
+
 
 //returns the rank in the leaderboard of a given score
 //row number when ordered by descending score
