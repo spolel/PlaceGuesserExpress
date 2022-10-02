@@ -300,6 +300,30 @@ app.get("/get_leaderboard", async (req, res) => {
   res.send(data);
 });
 
+//returns leaderboard paged
+app.get("/get_leaderboard_paged", async (req, res) => {
+  const index = parseInt(req.query.offset);
+  const size = parseInt(req.query.size);
+
+  const offset = index * size
+  
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select()
+    .order("score", { ascending: false })
+    .range(offset, offset+size-1);
+  res.send(data);
+});
+
+//returns leaderboard size
+app.get("/get_leaderboard_length", async (req, res) => {  
+  const { data, error } = await supabase
+    .from("leaderboard")
+    .select()
+    .order("score", { ascending: false })
+  res.send([data.length]);
+});
+
 //returns the rank in the leaderboard of a given score
 //row number when ordered by descending score
 app.get("/get_rank_from_leaderboard", async (req, res) => {
